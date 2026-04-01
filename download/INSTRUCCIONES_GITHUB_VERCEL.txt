@@ -1,0 +1,123 @@
+# =============================================
+# INSTRUCCIONES PARA SUBIR A GITHUB
+# COOTRACOVI - Sistema de Procesos Disciplinarios
+# =============================================
+
+## PASO 1: Crear Repositorio en GitHub
+
+1. Ir a https://github.com y entrar con las credenciales:
+   - Usuario: Cootracovi@jbyd.com.co
+   - Password: !Zaq1Xsw2Cde3
+
+2. Hacer clic en el botón "+" (esquina superior derecha)
+3. Seleccionar "New repository"
+4. Llenar los datos:
+   - Repository name: cootracovi-disciplinarios
+   - Description: Sistema de Procesos Disciplinarios COOTRACOVI
+   - Seleccionar "Public" o "Private" (recomendado Private)
+   - NO marcar "Add a README file"
+   - NO marcar "Add .gitignore"
+5. Hacer clic en "Create repository"
+
+## PASO 2: Subir el Código
+
+### Opción A: Desde la Terminal (si tiene acceso al ZIP descomprimido)
+
+```bash
+# Descomprimir el archivo
+unzip cootracovi-disciplinarios.zip -d cootracovi-disciplinarios
+cd cootracovi-disciplinarios
+
+# Inicializar Git
+git init
+git add .
+git commit -m "Initial commit - Sistema de Procesos Disciplinarios COOTRACOVI"
+
+# Conectar con GitHub (reemplazar USUARIO por el nombre de usuario real)
+git remote add origin https://github.com/USUARIO/cootracovi-disciplinarios.git
+git branch -M main
+git push -u origin main
+```
+
+### Opción B: Subir desde la Interfaz Web de GitHub
+
+1. En el repositorio creado, hacer clic en "uploading an existing file"
+2. Arrastrar todos los archivos del ZIP descomprimido
+3. En "Commit changes", escribir: "Initial commit"
+4. Hacer clic en "Commit changes"
+
+## PASO 3: Configurar Vercel
+
+1. Ir a https://vercel.com y entrar con la cuenta de GitHub
+2. Hacer clic en "Add New..." → "Project"
+3. Seleccionar el repositorio "cootracovi-disciplinarios"
+4. Hacer clic en "Import"
+5. Configurar las variables de entorno:
+
+   Hacer clic en "Environment Variables" y agregar:
+
+   | Variable | Valor |
+   |---------|-------|
+   | DATABASE_URL | mysql://usuario:password@servidor:3306/disciplinarios |
+   | NEXTAUTH_SECRET | (generar con: openssl rand -base64 32) |
+   | NEXTAUTH_URL | https://su-app.vercel.app |
+   | NEXT_PUBLIC_BASE_URL | https://su-app.vercel.app |
+
+6. Hacer clic en "Deploy"
+
+## PASO 4: Ejecutar Migraciones (Importante)
+
+Después de que Vercel termine el despliegue, ejecutar migraciones:
+
+1. En Vercel, ir a la pestaña "Deployments"
+2. Hacer clic en el último despliegue
+3. Ir a "Functions" → Abrir terminal
+4. Ejecutar:
+   ```
+   npx prisma migrate deploy
+   npx prisma db seed
+   ```
+
+O usar el botón "Run Command" en Vercel dashboard.
+
+## PASO 5: Probar la Aplicación
+
+1. Abrir la URL de Vercel (ejemplo: https://cootracovi-disciplinarios.vercel.app)
+2. Verificar que aparezca la pantalla de login
+3. Entrar con las credenciales:
+   - Email: operaciones@cootracovi.com
+   - Password: Cootracovi2026!
+
+## =============================================
+# IMPORTANTE: Variables de Entorno en Vercel
+# =============================================
+
+Para MySQL, la variable DATABASE_URL debe tener este formato:
+
+mysql://USUARIO:PASSWORD@HOST:PUERTO/NOMBRE_BASE_DATOS
+
+Ejemplo:
+mysql://cootracovi_admin:M1P@ssw0rd!@mysql-server.example.com:3306/cootracovi_db
+
+## =============================================
+# USUARIOS DEL SISTEMA
+# =============================================
+
+| Email | Rol |
+|-------|-----|
+| operaciones@cootracovi.com | Líder de Operaciones |
+| ggrh@cootracovi.com | Líder de GGHH |
+| gerencia@cootracovi.com | Gerencia |
+| consejo@cootracovi.com | Consejo de Administración |
+| apelaciones@cootracovi.com | Comité de Apelaciones |
+
+Password inicial: Cootracovi2026!
+
+## =============================================
+# CONTACTO SOPORTE
+# =============================================
+
+Si tiene problemas durante la instalación, revise:
+- Logs de Vercel en la pestaña "Deployments"
+- Variables de entorno configuradas correctamente
+- Conexión a MySQL desde Vercel

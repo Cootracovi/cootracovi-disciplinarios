@@ -1,0 +1,294 @@
+// ============================================
+// COOTRACOVI - Sistema de Procesos Disciplinarios
+// Esquema de Base de Datos MySQL
+// IDs: Enteros con auto-incremento
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USUARIOS DEL SISTEMA
+// ============================================
+// Roles: LIDER_OPERACIONES, LIDER_GGRH, GERENCIA, CONSEJO_ADMINISTRACION, COMITE_APELACIONES
+model Usuario {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  email     String   @unique
+  password  String   // Hash bcrypt
+  rol       String   // LIDER_OPERACIONES, LIDER_GGRH, GERENCIA, CONSEJO_ADMINISTRACION, COMITE_APELACIONES
+  activo    Boolean  @default(true)
+  telefono  String?
+  ultimoAcceso DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  casosResponsable  Caso[]      @relation("CasosResponsable")
+  decisiones1       Decision[]  @relation("Decisiones1")
+  decisiones2       Decision[]  @relation("Decisiones2")
+  historialAcciones HistorialEtapa[]
+
+  @@index([email])
+  @@index([rol])
+  @@map("usuarios")
+}
+
+// ============================================
+// INDICIADOS (Personas en proceso disciplinario)
+// ============================================
+model Indiciado {
+  id              Int      @id @default(autoincrement())
+  identificacion  String   @unique  // Cédula o ID interno
+  nombre          String
+  rol             String   // CONDUCTOR, DESPACHADOR, LIDER_PROCESO, GERENCIA, ASOCIADO, AFILIADO
+  grupo           String   // EMPLEADO, PROPIETARIO
+  telefono        String?
+  email           String?
+  direccion       String?
+  fechaIngreso    DateTime?  // Fecha de ingreso a la cooperativa
+  antecedentes    String?    // Antecedentes disciplinarios previos
+  activo          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  casos           Caso[]
+
+  @@index([identificacion])
+  @@index([grupo])
+  @@map("indiciados")
+}
+
+// ============================================
+// CASOS DISCIPLINARIOS
+// ============================================
+model Caso {
+  id                    Int      @id @default(autoincrement())
+  numeroCaso            String   @unique  // PD-2026-001
+  fechaSuceso           DateTime
+  lugarSuceso           String?
+  descripcionSuceso     String    @db.Text
+  testigos              String?   @db.Text
+  evidencias            String?   @db.Text  // Descripción de evidencias
+
+  // Análisis de IA
+  faltaIdentificada     String?   @db.Text
+  gravedadFalta         String?   // LEVE, GRAVE, GRAVISIMA
+  articulosVulnerados   String?   @db.Text
+  atenuantes            String?   @db.Text
+  agravantes            String?   @db.Text
+  sancionesSugeridas    String?   @db.Text
+  analisisGenerado      DateTime?
+
+  // Estado del proceso
+  estado                String   @default("INICIADO")  // INICIADO, PENDIENTE_NOTIFICACION, PENDIENTE_DESCARGOS, CON_DESCARGOS, DECISION_1RA, APELACION, DECISION_2DA, CERRADO
+  etapaActual           Int      @default(1)  // 1-8 según flujo
+
+  // Fechas importantes
+  fechaInicio           DateTime  @default(now())
+  fechaNotificacion     DateTime?
+  fechaDescargos        DateTime?
+  fechaDecision1        DateTime?
+  fechaApelacion        DateTime?
+  fechaDecision2        DateTime?
+  fechaCierre           DateTime?
+  fechaLimiteDescargos  DateTime?  // Límite para presentar descargos (5 días hábiles)
+
+  // Relaciones
+  indiciadoId           Int
+  indiciado             Indiciado       @relation(fields: [indiciadoId], references: [id])
+  responsableId         Int
+  responsable           Usuario         @relation("CasosResponsable", fields: [responsableId], references: [id])
+  rolResponsable        String
+  nombreResponsable     String    // Nombre del responsable (desnormalizado para reportes)
+
+  // Descargos
+  descargos             String?   @db.Text
+  aceptaTerminos        Boolean   @default(false)
+  fechaAceptaTerminos   DateTime?
+  tokenAcceso           String?   @unique  // Token para acceso del indiciado
+  tokenExpiracion       DateTime?
+
+  // Evidencias
+  firmaDigital          String?   @db.Text  // Base64 de la firma
+  fotoCedula            String?   @db.Text  // Base64 de la foto
+
+  // Capacitación asignada
+  capacitacionAsignada  Boolean   @default(false)
+  enlaceCapacitacion    String?
+  capacitacionCompletada Boolean  @default(false)
+  fechaCapacitacion     DateTime?
+
+  // Archivos adjuntos
+  documentoFinal        String?   // URL del PDF final
+
+  // Historial y decisiones
+  historial             HistorialEtapa[]
+  decisiones            Decision[]
+
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([numeroCaso])
+  @@index([estado])
+  @@index([fechaInicio])
+  @@index([indiciadoId])
+  @@map("casos")
+}
+
+// ============================================
+// HISTORIAL DE ETAPAS
+// ============================================
+model HistorialEtapa {
+  id            Int       @id @default(autoincrement())
+  casoId        Int
+  caso          Caso      @relation(fields: [casoId], references: [id], onDelete: Cascade)
+  etapa         Int
+  nombreEtapa   String
+  fecha         DateTime  @default(now())
+  observacion   String?   @db.Text
+  usuarioId     Int?
+  usuario       Usuario?  @relation(fields: [usuarioId], references: [id])
+  datosAdicionales String? @db.Text  // JSON con datos adicionales
+
+  @@index([casoId])
+  @@index([etapa])
+  @@map("historial_etapas")
+}
+
+// ============================================
+// DECISIONES DEL PROCESO
+// ============================================
+model Decision {
+  id                  Int       @id @default(autoincrement())
+  casoId              Int
+  caso                Caso      @relation(fields: [casoId], references: [id], onDelete: Cascade)
+
+  instancia           String    // PRIMERA, SEGUNDA
+  tipoDecision        String    // ABSOLVER, SANCIONAR, CONFIRMAR, MODIFICAR
+  tipoSancion         String?   // RECONVENCION, AMONESTACION_ECONOMICA, SUSPENSION, EXPULSION
+  diasSuspension      Int?
+  montoMulta          Decimal?  @db.Decimal(15, 2)
+  fundamentacion      String    @db.Text
+
+  responsableId       Int
+  responsable1        Usuario?  @relation("Decisiones1", fields: [responsableId], references: [id])
+  responsable2Id      Int?
+  responsable2        Usuario?  @relation("Decisiones2", fields: [responsable2Id], references: [id])
+
+  // Apelación
+  apelacionSolicitada Boolean   @default(false)
+  apelacionArgumentos String?   @db.Text
+  fechaApelacion      DateTime?
+
+  fecha               DateTime  @default(now())
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([casoId])
+  @@index([instancia])
+  @@map("decisiones")
+}
+
+// ============================================
+// DOCUMENTOS NORMATIVOS
+// ============================================
+model DocumentoNormativo {
+  id          Int       @id @default(autoincrement())
+  nombre      String
+  tipo        String    // CST, RIT, PESV, PSST, ESTATUTO, ETICA, BUEN_GOBIERNO, CODIGO_CONDUCTA
+  grupo       String    // EMPLEADO, PROPIETARIO, AMBOS
+  descripcion String?   @db.Text
+  urlArchivo  String?   // URL del archivo en el servidor o Google Drive
+  contenido   String?   @db.Text  // Texto extraído para análisis
+  activo      Boolean   @default(true)
+  version     String?
+  fechaActualizacion DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tipo])
+  @@index([grupo])
+  @@map("documentos_normativos")
+}
+
+// ============================================
+// ENLACES DE CAPACITACIÓN (Microsoft Forms)
+// ============================================
+model EnlaceCapacitacion {
+  id              Int       @id @default(autoincrement())
+  nombre          String
+  descripcion     String?   @db.Text
+  url             String
+  tipoFalta       String?   // LEVE, GRAVE, GRAVISIMA, TODOS
+  grupoDestino    String?   // EMPLEADO, PROPIETARIO, TODOS
+  duracionMinutos Int?
+  obligatorio     Boolean   @default(true)
+  activo          Boolean   @default(true)
+  orden           Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([tipoFalta])
+  @@index([grupoDestino])
+  @@map("enlaces_capacitacion")
+}
+
+// ============================================
+// CONFIGURACIÓN DEL SISTEMA
+// ============================================
+model Configuracion {
+  id          Int       @id @default(autoincrement())
+  clave       String    @unique
+  valor       String    @db.Text
+  descripcion String?
+  tipo        String?   // STRING, NUMBER, BOOLEAN, JSON
+  updatedAt   DateTime  @updatedAt
+
+  @@map("configuracion")
+}
+
+// ============================================
+// LOG DE ACTIVIDADES (Auditoría)
+// ============================================
+model LogActividad {
+  id            Int       @id @default(autoincrement())
+  usuarioId     Int?
+  accion        String
+  modulo        String
+  descripcion   String    @db.Text
+  datosAntes    String?   @db.Text  // JSON
+  datosDespues  String?   @db.Text  // JSON
+  ip            String?
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+
+  @@index([usuarioId])
+  @@index([accion])
+  @@index([createdAt])
+  @@map("log_actividades")
+}
+
+// ============================================
+// NOTIFICACIONES
+// ============================================
+model Notificacion {
+  id          Int       @id @default(autoincrement())
+  usuarioId   Int
+  titulo      String
+  mensaje     String    @db.Text
+  tipo        String    // INFO, WARNING, SUCCESS, ERROR
+  leida       Boolean   @default(false)
+  fechaLeida  DateTime?
+  enlace      String?   // URL relacionada
+  createdAt   DateTime  @default(now())
+
+  @@index([usuarioId])
+  @@index([leida])
+  @@map("notificaciones")
+}
